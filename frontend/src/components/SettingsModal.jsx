@@ -115,10 +115,11 @@ export default function SettingsModal({ isOpen, onClose, settings, onSaveSetting
                 <Cloud className="w-4 h-4 text-cyan-400" /> Cloud LLM Provider
               </label>
 
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {[
                   { id: 'groq', label: 'Groq Cloud', badge: 'Ultra-Fast (0.3s)' },
                   { id: 'openai', label: 'OpenAI', badge: 'GPT-4o mini' },
+                  { id: 'huggingface', label: 'Hugging Face', badge: 'Open Source / Hub' },
                   { id: 'auto', label: 'Auto / Default', badge: 'System Default' }
                 ].map((p) => (
                   <button
@@ -139,14 +140,20 @@ export default function SettingsModal({ isOpen, onClose, settings, onSaveSetting
 
               <div className="space-y-1 mt-2">
                 <div className="flex justify-between text-xs">
-                  <span className="text-white text-[11px]">Custom Cloud API Key (Optional)</span>
+                  <span className="text-white text-[11px]">Custom API Key / Token (Optional)</span>
                   <span className="text-[10px] text-cyber-muted">Overrides server default</span>
                 </div>
                 <input
                   type="password"
                   value={apiKey}
                   onChange={(e) => setApiKey(e.target.value)}
-                  placeholder={provider === 'groq' ? 'gsk_... (Groq API Key)' : 'sk-... (OpenAI API Key)'}
+                  placeholder={
+                    provider === 'groq'
+                      ? 'gsk_... (Groq API Key)'
+                      : provider === 'huggingface'
+                      ? 'hf_... (Hugging Face Token)'
+                      : 'sk-... (OpenAI API Key)'
+                  }
                   className="w-full py-2 px-3 rounded-xl bg-cyber-card/80 border border-cyber-border text-white text-xs placeholder-cyber-muted focus:outline-none focus:border-cyan-400 font-mono"
                 />
                 <p className="text-[10px] text-cyber-muted">

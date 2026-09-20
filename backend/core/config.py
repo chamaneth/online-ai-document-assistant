@@ -24,12 +24,14 @@ class Settings:
     LLM_MODEL_NAME: str = os.environ.get("LLM_MODEL_NAME", "MBZUAI/LaMini-Flan-T5-248M")
     MAX_FILE_SIZE_BYTES: int = int(os.environ.get("MAX_FILE_SIZE_MB", "50")) * 1024 * 1024
 
-    # Cloud LLM Providers
+    # Cloud & Hugging Face LLM Providers
     LLM_PROVIDER: str = os.environ.get("LLM_PROVIDER", "groq")
     GROQ_API_KEY: str = os.environ.get("GROQ_API_KEY", "")
     GROQ_MODEL: str = os.environ.get("GROQ_MODEL", "llama-3.1-8b-instant")
     OPENAI_API_KEY: str = os.environ.get("OPENAI_API_KEY", "")
     OPENAI_MODEL: str = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
+    HUGGINGFACEHUB_API_TOKEN: str = os.environ.get("HUGGINGFACEHUB_API_TOKEN", "")
+    HF_MODEL: str = os.environ.get("HF_MODEL", "meta-llama/Meta-Llama-3-8B-Instruct")
 
     def __init__(self):
         os.makedirs(self.UPLOADS_DIR, exist_ok=True)
