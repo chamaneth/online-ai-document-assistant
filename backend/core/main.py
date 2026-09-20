@@ -5,7 +5,6 @@ from core.security import add_security_headers
 from core.routes.health import router as health_router
 from core.routes.pdf import router as pdf_router
 from core.routes.query import router as query_router
-from core.routes.admin import router as admin_router
 
 def create_app() -> FastAPI:
     app = FastAPI(
@@ -27,7 +26,6 @@ def create_app() -> FastAPI:
     app.include_router(health_router)
     app.include_router(pdf_router)
     app.include_router(query_router)
-    app.include_router(admin_router)
 
     return app
 

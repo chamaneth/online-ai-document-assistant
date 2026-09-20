@@ -3,7 +3,6 @@ import axios from 'axios';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import ChatWorkspace from './components/ChatWorkspace';
-import AdminDashboard from './components/AdminDashboard';
 import SettingsModal from './components/SettingsModal';
 import PasteTextModal from './components/PasteTextModal';
 import LoadingScreen from './components/LoadingScreen';
@@ -14,10 +13,8 @@ axios.defaults.headers.common['X-API-Key'] = API_SECRET_KEY;
 export default function App() {
   const abortControllerRef = useRef(null);
   const [initialLoading, setInitialLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('chat');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isPasteModalOpen, setIsPasteModalOpen] = useState(false);
-  const [showAdminPanel, setShowAdminPanel] = useState(true);
   
   const [appSettings, setAppSettings] = useState({
     theme: 'cyber-dark',
@@ -55,21 +52,10 @@ export default function App() {
       const res = await axios.get(`${API_BASE_URL}/health`);
       if (res.data.status === 'healthy') {
         setBackendConnected(true);
-        setShowAdminPanel(!!res.data.enable_admin_panel);
         fetchIndexedDocs();
-        fetchLicenseStatus();
       }
     } catch (err) {
       setBackendConnected(false);
-    }
-  };
-
-  const fetchLicenseStatus = async () => {
-    try {
-      const res = await axios.get(`${API_BASE_URL}/license/status`);
-      setLicenseInfo(res.data);
-    } catch (err) {
-      console.error("Error fetching license status:", err);
     }
   };
 
@@ -84,7 +70,6 @@ export default function App() {
 
   useEffect(() => {
     checkBackendHealth();
-    fetchLicenseStatus();
     const interval = setInterval(checkBackendHealth, 5000);
     return () => clearInterval(interval);
   }, []);
@@ -182,7 +167,6 @@ export default function App() {
   const handleSendMessage = async (questionText) => {
     if (!questionText.trim()) return;
 
-    // Create abort controller for stop response capability
     const controller = new AbortController();
     abortControllerRef.current = controller;
 
@@ -211,7 +195,7 @@ export default function App() {
       setMessages(prev => [...prev, botMsg]);
     } catch (err) {
       if (axios.isCancel(err) || err.name === 'CanceledError' || err.code === 'ERR_CANCELED') {
-        return; // User canceled request intentionally
+        return;
       }
       const errMsg = err.response?.data?.detail || err.message || 'Failed to get answer.';
       setMessages(prev => [
@@ -288,37 +272,30 @@ export default function App() {
     <div className={`h-screen w-screen flex flex-col ${activeBgClass} overflow-hidden font-sans transition-colors duration-300`}>
       <Header 
         backendConnected={backendConnected} 
-        showAdminPanel={showAdminPanel}
-        activeTab={activeTab} 
-        setActiveTab={setActiveTab}
         onOpenSettings={() => setIsSettingsOpen(true)}
       />
       
-      {activeTab === 'chat' ? (
-        <div className="flex flex-1 overflow-hidden">
-          <Sidebar
-            onUploadPDF={handleUploadPDF}
-            onClearDB={handleClearDB}
-            onDeleteDoc={handleDeleteDoc}
-            onOpenPasteModal={() => setIsPasteModalOpen(true)}
-            indexedDocs={indexedDocs}
-            uploading={uploading}
-            statusMessage={statusMessage}
-          />
+      <div className="flex flex-1 overflow-hidden">
+        <Sidebar
+          onUploadPDF={handleUploadPDF}
+          onClearDB={handleClearDB}
+          onDeleteDoc={handleDeleteDoc}
+          onOpenPasteModal={() => setIsPasteModalOpen(true)}
+          indexedDocs={indexedDocs}
+          uploading={uploading}
+          statusMessage={statusMessage}
+        />
 
-          <ChatWorkspace
-            messages={messages}
-            onSendMessage={handleSendMessage}
-            onStopResponse={handleStopResponse}
-            onExportChat={handleExportChat}
-            loading={loadingQuery}
-            hasDocs={indexedDocs.length > 0}
-            settings={appSettings}
-          />
-        </div>
-      ) : (
-        <AdminDashboard onClearDB={handleClearDB} />
-      )}
+        <ChatWorkspace
+          messages={messages}
+          onSendMessage={handleSendMessage}
+          onStopResponse={handleStopResponse}
+          onExportChat={handleExportChat}
+          loading={loadingQuery}
+          hasDocs={indexedDocs.length > 0}
+          settings={appSettings}
+        />
+      </div>
 
       <SettingsModal
         isOpen={isSettingsOpen}
