@@ -18,10 +18,10 @@ export default function Header({
               AI DOCUMENT ASSISTANT
             </h1>
             <span className="text-[10px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded-full border bg-cyan-500/10 text-cyan-400 border-cyan-500/20">
-              DOCUMENT Q&A
+              RAG ASSISTANT
             </span>
           </div>
-          <p className="text-[10px] text-cyber-muted font-mono">Ask questions from your documents</p>
+          <p className="text-[10px] text-cyber-muted font-mono">AI RAG Document Assistant</p>
         </div>
       </div>
 

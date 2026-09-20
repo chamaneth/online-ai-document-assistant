@@ -1,42 +1,41 @@
-# Document Q&A Web App
+# AI Document Assistant (RAG Assistant)
 
-A simple full-stack web application where you can upload documents and ask questions about them.
+A full-stack **RAG (Retrieval-Augmented Generation)** document assistant that lets you upload documents and ask questions with AI.
 
 ---
 
 ## What It Does
 
-- **Upload Files**: Upload your PDF, Word (`.docx`), or text notes.
-- **Ask Questions**: Ask questions in simple English about your files.
-- **Fast Answers**: Uses Groq (Llama 3.1) or OpenAI to give answers in seconds.
-- **Shows Sources**: Every answer shows the document name and page number so you can check where it came from.
-- **Stop Button**: Click the stop button anytime to cancel an answer while it is generating.
+- **RAG Document Search**: Upload PDF, Word (`.docx`), or text notes into a vector database (**ChromaDB**).
+- **AI Assistant**: Ask questions and get fast answers using Groq (Llama 3.1) or OpenAI.
+- **Shows Citations**: Every answer includes the exact document name and page number source.
+- **Stop Response**: Cancel an answer anytime with a single click.
 
 ---
 
-## Tools Used
+## Tech Stack
 
 - **Frontend**: React, Vite, Tailwind CSS
 - **Backend**: Python, FastAPI
-- **Search Database**: ChromaDB
-- **AI**: Groq API (free & fast) and OpenAI API
+- **RAG / Vector Store**: ChromaDB
+- **AI Models**: Groq Cloud (Llama 3.1) and OpenAI
 
 ---
 
-## Project Folders
+## Project Structure
 
 ```text
 online-ai-document-assistant/
-├── backend/                  # Python FastAPI backend
-│   ├── core/                 # App logic, search, and AI connection
-│   ├── app.py                # Starts the backend server
-│   ├── render.yaml           # Easy setup for Render
-│   └── requirements.txt      # Python libraries needed
+├── backend/                  # FastAPI Python backend (RAG & AI)
+│   ├── core/                 # Search logic, routes, and LLM services
+│   ├── app.py                # Server entry point
+│   ├── render.yaml           # Deployment config for Render
+│   └── requirements.txt      # Python dependencies
 │
-├── frontend/                 # React user interface
-│   ├── src/                  # React components and pages
-│   ├── vercel.json           # Easy setup for Vercel
-│   └── package.json          # Frontend packages
+├── frontend/                 # React UI
+│   ├── src/                  # Components and chat workspace
+│   ├── vercel.json           # Deployment config for Vercel
+│   └── package.json
 │
 └── README.md
 ```
@@ -50,14 +49,14 @@ online-ai-document-assistant/
 ```bash
 cd backend
 
-# Create and turn on Python virtual environment
+# Create and activate Python virtual environment
 python -m venv .venv
 source .venv/bin/activate    # On Windows: .venv\Scripts\activate
 
-# Install requirements
+# Install dependencies
 pip install -r requirements.txt
 
-# Start backend
+# Run backend
 python app.py
 ```
 Backend runs at `http://127.0.0.1:8000`.
@@ -66,15 +65,13 @@ Backend runs at `http://127.0.0.1:8000`.
 
 ### 2. Run the Frontend
 
-In a new terminal window:
-
 ```bash
 cd frontend
 
-# Install packages
+# Install dependencies
 npm install
 
-# Start frontend
+# Start development server
 npm run dev
 ```
 Open `http://localhost:5173` in your browser.
@@ -83,5 +80,5 @@ Open `http://localhost:5173` in your browser.
 
 ## Deployment
 
-- **Frontend**: Connect your GitHub repo to **Vercel** and set the root directory to `frontend`.
-- **Backend**: Connect your GitHub repo to **Render** as a Web Service and set the root directory to `backend`.
+- **Frontend**: Deploy on **Vercel** (set root folder to `frontend`).
+- **Backend**: Deploy on **Render** (set start command to `uvicorn app:app --host 0.0.0.0 --port $PORT`).
