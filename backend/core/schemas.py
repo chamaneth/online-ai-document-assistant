@@ -6,6 +6,8 @@ class QueryRequest(BaseModel):
     chat_history: Optional[List[Dict[str, Any]]] = []
     top_k: Optional[int] = 3
     max_length: Optional[int] = 512
+    api_key: Optional[str] = None
+    provider: Optional[str] = None
 
 class RawTextUploadRequest(BaseModel):
     title: str

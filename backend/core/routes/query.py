@@ -15,18 +15,15 @@ async def query_rag(request: QueryRequest):
             citations=[]
         )
 
-    allowed = record_trial_query()
-    if not allowed:
-        raise HTTPException(
-            status_code=403, 
-            detail="TRIAL_LIMIT_EXCEEDED: You have completed your 3-question free trial. Activate a Lifetime License ($29) to unlock unlimited questions."
-        )
+    record_trial_query()
 
     return await rag_service.execute_query(
         question=request.question,
         chat_history=request.chat_history or [],
         top_k=request.top_k or 3,
-        max_length=request.max_length or 512
+        max_length=request.max_length or 512,
+        custom_api_key=request.api_key,
+        provider=request.provider
     )
 
 @router.delete("/clear_db", dependencies=[Depends(verify_api_key)])

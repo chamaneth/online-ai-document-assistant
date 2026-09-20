@@ -1,11 +1,145 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, FileText, Sparkles, ChevronDown, ChevronUp, Copy, Check, Download, Lightbulb, ShieldAlert, BarChart3, ListChecks, Lock, Key } from 'lucide-react';
+import { Send, Bot, User, FileText, Sparkles, ChevronDown, ChevronUp, Copy, Check, Download, Lightbulb, ShieldAlert, BarChart3, ListChecks, Lock, Key, Square } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+
+function formatInline(text) {
+  if (!text) return null;
+  const parts = [];
+  const regex = /(\*\*[^*]+\*\*|`[^`]+`|\*[^*]+\*)/g;
+  let lastIndex = 0;
+  let match;
+
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index));
+    }
+    const token = match[0];
+    if (token.startsWith('**') && token.endsWith('**')) {
+      parts.push(
+        <strong key={match.index} className="text-white font-semibold">
+          {token.slice(2, -2)}
+        </strong>
+      );
+    } else if (token.startsWith('`') && token.endsWith('`')) {
+      parts.push(
+        <code key={match.index} className="px-1.5 py-0.5 rounded bg-black/40 border border-cyber-border text-cyan-300 font-mono text-xs">
+          {token.slice(1, -1)}
+        </code>
+      );
+    } else if (token.startsWith('*') && token.endsWith('*')) {
+      parts.push(
+        <em key={match.index} className="text-cyan-200">
+          {token.slice(1, -1)}
+        </em>
+      );
+    }
+    lastIndex = regex.lastIndex;
+  }
+
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex));
+  }
+
+  return parts.length > 0 ? parts : text;
+}
+
+function FormattedMessage({ text }) {
+  if (!text) return null;
+
+  const lines = text.split('\n');
+  const elements = [];
+  let inCodeBlock = false;
+  let codeBuffer = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    if (line.trim().startsWith('```')) {
+      if (inCodeBlock) {
+        elements.push(
+          <pre key={`code-${i}`} className="p-3 rounded-xl bg-black/60 border border-cyber-border text-cyan-300 font-mono text-xs overflow-x-auto my-2">
+            <code>{codeBuffer.join('\n')}</code>
+          </pre>
+        );
+        codeBuffer = [];
+        inCodeBlock = false;
+      } else {
+        inCodeBlock = true;
+      }
+      continue;
+    }
+
+    if (inCodeBlock) {
+      codeBuffer.push(line);
+      continue;
+    }
+
+    const trimmed = line.trim();
+    if (!trimmed) {
+      elements.push(<div key={`sp-${i}`} className="h-1.5" />);
+      continue;
+    }
+
+    if (trimmed.startsWith('### ')) {
+      elements.push(
+        <h4 key={`h4-${i}`} className="text-sm font-bold text-white mt-2 mb-1 font-['Outfit']">
+          {formatInline(trimmed.slice(4))}
+        </h4>
+      );
+    } else if (trimmed.startsWith('## ')) {
+      elements.push(
+        <h3 key={`h3-${i}`} className="text-base font-bold text-white mt-3 mb-1.5 font-['Outfit']">
+          {formatInline(trimmed.slice(3))}
+        </h3>
+      );
+    } else if (trimmed.startsWith('# ')) {
+      elements.push(
+        <h2 key={`h2-${i}`} className="text-lg font-bold text-white mt-3 mb-2 font-['Outfit']">
+          {formatInline(trimmed.slice(2))}
+        </h2>
+      );
+    } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+      elements.push(
+        <div key={`li-${i}`} className="flex items-start space-x-2 my-1 pl-1">
+          <span className="text-cyan-400 font-bold select-none">•</span>
+          <span className="text-slate-200 text-sm flex-1 leading-relaxed">{formatInline(trimmed.slice(2))}</span>
+        </div>
+      );
+    } else if (/^\d+\.\s/.test(trimmed)) {
+      const match = trimmed.match(/^(\d+)\.\s(.*)$/);
+      elements.push(
+        <div key={`nli-${i}`} className="flex items-start space-x-2 my-1 pl-1">
+          <span className="text-[11px] font-mono font-bold text-cyan-400 bg-cyan-500/10 px-1.5 py-0.5 rounded border border-cyan-500/20 select-none">
+            {match[1]}
+          </span>
+          <span className="text-slate-200 text-sm flex-1 leading-relaxed">{formatInline(match[2])}</span>
+        </div>
+      );
+    } else {
+      elements.push(
+        <p key={`p-${i}`} className="my-1 text-slate-200 text-sm leading-relaxed">
+          {formatInline(line)}
+        </p>
+      );
+    }
+  }
+
+  if (inCodeBlock && codeBuffer.length > 0) {
+    elements.push(
+      <pre key="code-end" className="p-3 rounded-xl bg-black/60 border border-cyber-border text-cyan-300 font-mono text-xs overflow-x-auto my-2">
+        <code>{codeBuffer.join('\n')}</code>
+      </pre>
+    );
+  }
+
+  return <div className="space-y-0.5">{elements}</div>;
+}
 
 export default function ChatWorkspace({ 
   messages, 
   onSendMessage, 
   loading, 
+  onStopResponse,
   hasDocs, 
   onExportChat, 
   settings,
@@ -158,7 +292,11 @@ export default function ChatWorkspace({
                     ? 'bg-blue-600/90 text-white shadow-cyber-glow rounded-tr-none' 
                     : 'glass-panel text-slate-200 border-cyber-border rounded-tl-none'
                 }`}>
-                  <p className="whitespace-pre-wrap">{msg.text}</p>
+                  {msg.sender === 'user' ? (
+                    <p className="whitespace-pre-wrap">{msg.text}</p>
+                  ) : (
+                    <FormattedMessage text={msg.text} />
+                  )}
 
                   {/* Copy Answer Icon for Bot Messages */}
                   {msg.sender === 'bot' && (
@@ -248,9 +386,22 @@ export default function ChatWorkspace({
             <div className="w-8 h-8 rounded-xl bg-cyber-card border border-cyber-border flex items-center justify-center">
               <Bot className="w-4 h-4 text-cyan-400 animate-pulse" />
             </div>
-            <div className="p-4 rounded-2xl glass-panel text-xs text-cyber-muted font-mono flex items-center space-x-3">
-              <div className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
-              <span>Searching document & crafting answer...</span>
+            <div className="p-4 rounded-2xl glass-panel text-xs text-cyber-muted font-mono flex items-center justify-between space-x-4 max-w-md">
+              <div className="flex items-center space-x-3">
+                <div className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+                <span>Searching document & crafting answer...</span>
+              </div>
+              {onStopResponse && (
+                <button
+                  type="button"
+                  onClick={onStopResponse}
+                  className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-red-500/15 hover:bg-red-500/25 border border-red-500/40 hover:border-red-500/60 text-red-400 text-xs font-mono transition-all shadow-sm"
+                  title="Stop generating"
+                >
+                  <Square className="w-3 h-3 fill-current" />
+                  <span>Stop</span>
+                </button>
+              )}
             </div>
           </motion.div>
         )}
@@ -279,39 +430,27 @@ export default function ChatWorkspace({
           </div>
         )}
 
-        {licenseInfo && !licenseInfo.is_licensed && licenseInfo.is_trial_locked ? (
-          <div className="max-w-4xl mx-auto p-4 rounded-2xl bg-gradient-to-r from-blue-900/40 via-purple-900/30 to-blue-900/40 border border-cyan-500/30 flex items-center justify-between shadow-2xl backdrop-blur-md">
-            <div className="flex items-center space-x-3.5">
-              <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center">
-                <Lock className="w-5 h-5 text-cyan-400" />
-              </div>
-              <div>
-                <h4 className="text-xs font-bold text-white font-['Outfit']">Free Trial Completed (3/3 Qs)</h4>
-                <p className="text-[11px] text-cyber-muted">To continue asking questions and index unlimited documents, unlock Lifetime Access for $29.</p>
-              </div>
-            </div>
-            <div className="flex items-center space-x-2">
-              <button
-                type="button"
-                onClick={onOpenLicense}
-                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-cyber-glow flex items-center gap-1.5 transition-all"
-              >
-                <Key className="w-3.5 h-3.5" />
-                <span>Unlock Lifetime ($29)</span>
-              </button>
-            </div>
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="relative flex items-center max-w-4xl mx-auto">
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              disabled={loading}
-              placeholder={hasDocs ? "Ask a question about your uploaded documents..." : "Upload a PDF or document first..."}
-              className="w-full py-3.5 pl-5 pr-14 rounded-2xl bg-cyber-card/80 border border-cyber-border text-white text-sm placeholder-cyber-muted focus:outline-none focus:border-blue-500/60 focus:ring-1 focus:ring-blue-500/60 transition-all shadow-inner"
-            />
+        <form onSubmit={handleSubmit} className="relative flex items-center max-w-4xl mx-auto">
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            disabled={loading}
+            placeholder={hasDocs ? "Ask a question about your uploaded documents..." : "Upload a PDF or document first..."}
+            className="w-full py-3.5 pl-5 pr-28 rounded-2xl bg-cyber-card/80 border border-cyber-border text-white text-sm placeholder-cyber-muted focus:outline-none focus:border-blue-500/60 focus:ring-1 focus:ring-blue-500/60 transition-all shadow-inner"
+          />
 
+          {loading ? (
+            <button
+              type="button"
+              onClick={onStopResponse}
+              className="absolute right-2 px-3 py-2 rounded-xl bg-red-600/90 hover:bg-red-500 text-white transition-all shadow-lg flex items-center gap-1.5 text-xs font-semibold border border-red-400/30 animate-pulse"
+              title="Stop generation"
+            >
+              <Square className="w-3.5 h-3.5 fill-current" />
+              <span>Stop</span>
+            </button>
+          ) : (
             <button
               type="submit"
               disabled={!input.trim() || loading}
@@ -319,8 +458,8 @@ export default function ChatWorkspace({
             >
               <Send className="w-4 h-4" />
             </button>
-          </form>
-        )}
+          )}
+        </form>
       </div>
     </main>
   );

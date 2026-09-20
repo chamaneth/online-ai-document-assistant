@@ -50,6 +50,20 @@ def verify_license_key(key: str) -> Dict[str, Any]:
         "message": f"Successfully activated {tier_names.get(tier)}!"
     }
 
+def _atomic_json_dump(file_path: str, data: Any):
+    """Safely persist JSON to disk using atomic rename to prevent corruption."""
+    try:
+        dir_name = os.path.dirname(file_path)
+        os.makedirs(dir_name, exist_ok=True)
+        temp_path = f"{file_path}.tmp"
+        with open(temp_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(temp_path, file_path)
+    except Exception as e:
+        print(f"[Licensing Error] Failed atomic write to {file_path}: {e}")
+
 TRIAL_USAGE_FILE_PATH = os.path.join(settings.DATA_DIR, "trial_usage.json")
 MAX_TRIAL_DOCS = 1
 MAX_TRIAL_QUERIES = 3
@@ -66,71 +80,32 @@ def get_trial_usage() -> Dict[str, int]:
     return {"queries_used": 0}
 
 def record_trial_query() -> bool:
-    """
-    Increment trial query counter. Returns False if limit exceeded.
-    """
-    license_status = get_current_license()
-    if license_status.get("is_licensed"):
-        return True # Unlimited for licensed users
-
+    """Record query usage - unlimited in online cloud mode."""
     usage = get_trial_usage()
-    if usage["queries_used"] >= MAX_TRIAL_QUERIES:
-        return False
-
-    usage["queries_used"] += 1
-    os.makedirs(os.path.dirname(TRIAL_USAGE_FILE_PATH), exist_ok=True)
-    try:
-        with open(TRIAL_USAGE_FILE_PATH, "w", encoding="utf-8") as f:
-            json.dump(usage, f, indent=2)
-    except Exception:
-        pass
+    usage["queries_used"] = usage.get("queries_used", 0) + 1
+    _atomic_json_dump(TRIAL_USAGE_FILE_PATH, usage)
     return True
 
 def can_upload_doc(current_doc_count: int) -> bool:
-    """Enforces 1 document trial limit and blocks uploads if trial is expired."""
-    license_status = get_current_license()
-    if license_status.get("is_licensed"):
-        return True
-    if license_status.get("is_trial_locked"):
-        return False
-    return current_doc_count < MAX_TRIAL_DOCS
+    """Allow unlimited uploads in online cloud mode."""
+    return True
 
 def get_current_license() -> Dict[str, Any]:
-    """Reads the stored license status or returns trial defaults."""
-    trial_info = get_trial_usage()
-    queries_used = trial_info.get("queries_used", 0)
+    """Retrieve activation state - fully unlocked for cloud evaluation."""
+    usage = get_trial_usage()
+    queries_used = usage.get("queries_used", 0)
 
-    if os.path.exists(LICENSE_FILE_PATH):
-        try:
-            with open(LICENSE_FILE_PATH, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                key = data.get("license_key", "")
-                result = verify_license_key(key)
-                if result["valid"]:
-                    return {
-                        "is_licensed": True,
-                        "tier": result["tier"],
-                        "tier_name": result["tier_name"],
-                        "license_key": key[:9] + "..." + key[-4:],
-                        "registered_to": data.get("registered_to", "Registered Owner"),
-                        "trial_queries_used": queries_used,
-                        "trial_queries_max": MAX_TRIAL_QUERIES,
-                        "trial_docs_max": MAX_TRIAL_DOCS
-                    }
-        except Exception:
-            pass
-            
     return {
-        "is_licensed": False,
-        "tier": "TRIAL",
-        "tier_name": "Evaluation Trial",
-        "license_key": None,
-        "registered_to": None,
+        "is_licensed": True,
+        "tier": "CLOUD_PRO",
+        "tier_name": "Cloud Enterprise Edition",
+        "license_key": "AIDA-CLOUD-UNLIMITED",
+        "registered_to": "Developer / Recruiter Evaluation",
         "trial_queries_used": queries_used,
-        "trial_queries_max": MAX_TRIAL_QUERIES,
-        "trial_queries_remaining": max(0, MAX_TRIAL_QUERIES - queries_used),
-        "trial_docs_max": MAX_TRIAL_DOCS,
-        "is_trial_locked": queries_used >= MAX_TRIAL_QUERIES
+        "trial_queries_max": 99999,
+        "trial_queries_remaining": 99999,
+        "trial_docs_max": 9999,
+        "is_trial_locked": False
     }
 
 def save_license(key: str, registered_to: str = "Verified Customer") -> Dict[str, Any]:
@@ -139,12 +114,10 @@ def save_license(key: str, registered_to: str = "Verified Customer") -> Dict[str
     if not verification["valid"]:
         return verification
         
-    os.makedirs(os.path.dirname(LICENSE_FILE_PATH), exist_ok=True)
-    with open(LICENSE_FILE_PATH, "w", encoding="utf-8") as f:
-        json.dump({
-            "license_key": verification["key"],
-            "tier": verification["tier"],
-            "registered_to": registered_to
-        }, f, indent=2)
+    _atomic_json_dump(LICENSE_FILE_PATH, {
+        "license_key": verification["key"],
+        "tier": verification["tier"],
+        "registered_to": registered_to
+    })
         
     return verification

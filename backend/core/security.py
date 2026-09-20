@@ -12,5 +12,6 @@ async def add_security_headers(request: Request, call_next):
     return response
 
 async def verify_api_key(x_api_key: Optional[str] = Header(None)):
-    if x_api_key and x_api_key != settings.API_SECRET_KEY:
-        raise HTTPException(status_code=403, detail="Unauthorized API Request: Invalid Security Token")
+    if settings.API_SECRET_KEY:
+        if not x_api_key or x_api_key != settings.API_SECRET_KEY:
+            raise HTTPException(status_code=403, detail="Unauthorized API Request: Invalid or Missing Security Token")

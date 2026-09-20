@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { X, Sliders, Palette, Cpu, ShieldCheck, Check } from 'lucide-react';
+import { X, Sliders, Palette, Cpu, ShieldCheck, Check, Cloud, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function SettingsModal({ isOpen, onClose, settings, onSaveSettings }) {
   const [theme, setTheme] = useState(settings?.theme || 'cyber-dark');
+  const [provider, setProvider] = useState(settings?.provider || 'groq');
+  const [apiKey, setApiKey] = useState(settings?.apiKey || '');
   const [topK, setTopK] = useState(settings?.topK || 3);
   const [maxLength, setMaxLength] = useState(settings?.maxLength || 512);
   const [autoScroll, setAutoScroll] = useState(settings?.autoScroll ?? true);
@@ -15,6 +17,8 @@ export default function SettingsModal({ isOpen, onClose, settings, onSaveSetting
   const handleSave = () => {
     onSaveSettings({
       theme,
+      provider,
+      apiKey,
       topK,
       maxLength,
       autoScroll,
@@ -102,6 +106,52 @@ export default function SettingsModal({ isOpen, onClose, settings, onSaveSetting
                   </div>
                   <span>Neon Violet</span>
                 </button>
+              </div>
+            </div>
+
+            {/* Cloud AI Provider & Custom Key */}
+            <div className="space-y-3 pt-2 border-t border-cyber-border">
+              <label className="text-xs font-bold text-cyber-muted uppercase tracking-wider flex items-center gap-2">
+                <Cloud className="w-4 h-4 text-cyan-400" /> Cloud LLM Provider
+              </label>
+
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { id: 'groq', label: 'Groq Cloud', badge: 'Ultra-Fast (0.3s)' },
+                  { id: 'openai', label: 'OpenAI', badge: 'GPT-4o mini' },
+                  { id: 'auto', label: 'Auto / Default', badge: 'System Default' }
+                ].map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => setProvider(p.id)}
+                    className={`p-2.5 rounded-xl border text-xs font-medium flex flex-col items-start transition-all ${
+                      provider === p.id
+                        ? 'border-cyan-400 bg-cyan-500/10 text-white shadow-cyber-glow'
+                        : 'border-cyber-border bg-cyber-card/40 text-cyber-muted hover:text-white'
+                    }`}
+                  >
+                    <span className="font-semibold text-xs">{p.label}</span>
+                    <span className="text-[9px] text-cyber-muted">{p.badge}</span>
+                  </button>
+                ))}
+              </div>
+
+              <div className="space-y-1 mt-2">
+                <div className="flex justify-between text-xs">
+                  <span className="text-white text-[11px]">Custom Cloud API Key (Optional)</span>
+                  <span className="text-[10px] text-cyber-muted">Overrides server default</span>
+                </div>
+                <input
+                  type="password"
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  placeholder={provider === 'groq' ? 'gsk_... (Groq API Key)' : 'sk-... (OpenAI API Key)'}
+                  className="w-full py-2 px-3 rounded-xl bg-cyber-card/80 border border-cyber-border text-white text-xs placeholder-cyber-muted focus:outline-none focus:border-cyan-400 font-mono"
+                />
+                <p className="text-[10px] text-cyber-muted">
+                  Leave empty to use the backend server's configured environment API keys.
+                </p>
               </div>
             </div>
 

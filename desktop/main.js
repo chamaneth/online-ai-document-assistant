@@ -30,13 +30,19 @@ function startPythonSidecar() {
 
   try {
     if (fs.existsSync(execPath)) {
+      const defaultModelsDir = isProd 
+        ? path.join(process.resourcesPath, '.models')
+        : path.join(__dirname, '..', 'backend', '.models');
+
       pythonProcess = spawn(execPath, execArgs, {
         cwd: cwdPath,
         shell: false,
         env: { 
           ...process.env, 
           PYTHONUNBUFFERED: '1',
-          API_SECRET_KEY: 'local_sec_token_984712839'
+          API_SECRET_KEY: 'local_sec_token_984712839',
+          ...(fs.existsSync(defaultModelsDir) ? { MODELS_DIR: defaultModelsDir } : {}),
+          ...(isProd ? { APP_DATA_DIR: app.getPath('userData') } : {})
         }
       });
 
@@ -64,20 +70,32 @@ function waitForBackend(callback, retries = 35) {
     return;
   }
 
-  http.get(`http://127.0.0.1:${BACKEND_PORT}/health`, (res) => {
+  const req = http.request({
+    hostname: '127.0.0.1',
+    port: BACKEND_PORT,
+    path: '/health',
+    method: 'GET',
+    headers: {
+      'X-API-Key': 'local_sec_token_984712839'
+    }
+  }, (res) => {
     if (res.statusCode === 200) {
       console.log('[Security Sidecar] FastAPI Backend verified healthy!');
       callback(true);
     } else {
       setTimeout(() => waitForBackend(callback, retries - 1), 1000);
     }
-  }).on('error', () => {
+  });
+
+  req.on('error', () => {
     setTimeout(() => waitForBackend(callback, retries - 1), 1000);
   });
+  req.end();
 }
 
 // 3. Create Main Electron Window with Production Path Mapping
 function createWindow() {
+  const iconPath = path.join(__dirname, 'assets', 'icon.png');
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
@@ -93,7 +111,7 @@ function createWindow() {
       webSecurity: true,
       allowRunningInsecureContent: false
     },
-    icon: path.join(__dirname, 'assets', 'icon.png')
+    ...(fs.existsSync(iconPath) ? { icon: iconPath } : {})
   });
 
   // Security Hardening: Block external popup window creation

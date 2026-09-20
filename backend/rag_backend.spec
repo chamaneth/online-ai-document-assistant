@@ -13,7 +13,7 @@ datas = (
     collect_data_files('transformers') + 
     collect_data_files('sentence_transformers') +
     collect_data_files('docx') +
-    [('.env', '.')]
+    ([('.env', '.')] if os.path.exists('.env') else [])
 )
 
 hiddenimports = (

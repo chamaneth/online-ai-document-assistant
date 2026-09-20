@@ -1,9 +1,69 @@
+import os
+import torch
 from langchain_huggingface import HuggingFaceEmbeddings, HuggingFacePipeline
 from transformers import pipeline, AutoModelForSeq2SeqLM, AutoTokenizer
 from core.config import settings
 
 _embeddings = None
-_llm = None
+_local_llm = None
+
+# Optimize CPU inference threads for fast on-device generation fallback
+if not torch.cuda.is_available():
+    try:
+        num_threads = min(8, max(2, os.cpu_count() or 4))
+        torch.set_num_threads(num_threads)
+    except Exception:
+        pass
+
+class CloudLLMClient:
+    """High-performance cloud LLM client wrapper supporting Groq and OpenAI."""
+    def __init__(self, provider: str, api_key: str, model_name: str):
+        self.provider = provider
+        self.api_key = api_key
+        self.model_name = model_name
+
+    def invoke(self, prompt: str) -> str:
+        if self.provider == "groq":
+            try:
+                from groq import Groq
+                client = Groq(api_key=self.api_key)
+                response = client.chat.completions.create(
+                    model=self.model_name or "llama-3.1-8b-instant",
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": "You are an expert AI Document Assistant. Provide concise, clear, accurate answers grounded in provided document context. Format with clean markdown."
+                        },
+                        {"role": "user", "content": prompt}
+                    ],
+                    max_tokens=450,
+                    temperature=0.2
+                )
+                return response.choices[0].message.content or "No response generated."
+            except Exception as e:
+                print(f"[Cloud LLM] Groq execution error: {e}")
+                raise e
+        elif self.provider == "openai":
+            try:
+                from openai import OpenAI
+                client = OpenAI(api_key=self.api_key)
+                response = client.chat.completions.create(
+                    model=self.model_name or "gpt-4o-mini",
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": "You are an expert AI Document Assistant. Provide concise, clear, accurate answers grounded in provided document context. Format with clean markdown."
+                        },
+                        {"role": "user", "content": prompt}
+                    ],
+                    max_tokens=450,
+                    temperature=0.2
+                )
+                return response.choices[0].message.content or "No response generated."
+            except Exception as e:
+                print(f"[Cloud LLM] OpenAI execution error: {e}")
+                raise e
+        return "Unsupported cloud provider."
 
 def get_embeddings():
     global _embeddings
@@ -15,10 +75,36 @@ def get_embeddings():
         )
     return _embeddings
 
-def get_llm():
-    global _llm
-    if _llm is None:
-        print(f"[Model Service] Loading LLM Pipeline ({settings.LLM_MODEL_NAME})...")
+def get_llm(custom_api_key: str = None, provider: str = None):
+    """
+    Returns an LLM client.
+    Priority:
+    1. Dynamic custom_api_key passed from request header / settings UI
+    2. Environment GROQ_API_KEY (defaulting to llama-3.1-8b-instant)
+    3. Environment OPENAI_API_KEY (defaulting to gpt-4o-mini)
+    4. Local HuggingFace on-device model fallback
+    """
+    prov = (provider or settings.LLM_PROVIDER or "auto").lower()
+    groq_key = custom_api_key if prov == "groq" else (settings.GROQ_API_KEY or os.environ.get("GROQ_API_KEY", ""))
+    openai_key = custom_api_key if prov == "openai" else (settings.OPENAI_API_KEY or os.environ.get("OPENAI_API_KEY", ""))
+
+    # Detect key format directly if custom key passed
+    if custom_api_key:
+        if custom_api_key.startswith("gsk_") or prov == "groq":
+            return CloudLLMClient("groq", custom_api_key, settings.GROQ_MODEL)
+        elif custom_api_key.startswith("sk-") or prov == "openai":
+            return CloudLLMClient("openai", custom_api_key, settings.OPENAI_MODEL)
+
+    if (prov in ["groq", "auto"]) and groq_key:
+        return CloudLLMClient("groq", groq_key, settings.GROQ_MODEL)
+
+    if (prov in ["openai", "auto"]) and openai_key:
+        return CloudLLMClient("openai", openai_key, settings.OPENAI_MODEL)
+
+    # Local on-device fallback
+    global _local_llm
+    if _local_llm is None:
+        print(f"[Model Service] Initializing Local LLM Engine ({settings.LLM_MODEL_NAME})...")
         tokenizer = AutoTokenizer.from_pretrained(settings.LLM_MODEL_NAME, cache_dir=settings.HUB_DIR)
         model = AutoModelForSeq2SeqLM.from_pretrained(settings.LLM_MODEL_NAME, cache_dir=settings.HUB_DIR)
 
@@ -26,8 +112,9 @@ def get_llm():
             "text2text-generation",
             model=model,
             tokenizer=tokenizer,
-            max_length=512,
+            max_new_tokens=180,
+            truncation=True,
             do_sample=False
         )
-        _llm = HuggingFacePipeline(pipeline=pipe)
-    return _llm
+        _local_llm = HuggingFacePipeline(pipeline=pipe)
+    return _local_llm

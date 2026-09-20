@@ -10,8 +10,8 @@ from core.routes.license import router as license_router
 
 def create_app() -> FastAPI:
     app = FastAPI(
-        title="AI Document Assistant Offline API",
-        description="Commercial RAG Engine with Admin Telemetry, Layered Architecture, Local Caching & Security Hardening",
+        title="AI Document Assistant Cloud API",
+        description="High-Performance Cloud RAG Platform with Semantic Vector Search, Dynamic Citations & Secure Architecture",
         version="2.0.0"
     )
 

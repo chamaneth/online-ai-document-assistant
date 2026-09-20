@@ -1,10 +1,11 @@
-from fastapi import APIRouter, HTTPException, Body
+from fastapi import APIRouter, HTTPException, Body, Depends
 from pydantic import BaseModel
 from typing import Optional
 from core.licensing import get_current_license, save_license, verify_license_key, LICENSE_FILE_PATH
+from core.security import verify_api_key
 import os
 
-router = APIRouter(prefix="/license", tags=["Licensing"])
+router = APIRouter(prefix="/license", tags=["Licensing"], dependencies=[Depends(verify_api_key)])
 
 class ActivateRequest(BaseModel):
     license_key: str

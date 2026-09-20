@@ -1,7 +1,13 @@
 import os
 import sys
+import multiprocessing
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+multiprocessing.freeze_support()
+
+if getattr(sys, 'frozen', False):
+    sys.path.insert(0, os.path.dirname(sys.executable))
+else:
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from core.main import app
 from core.config import settings

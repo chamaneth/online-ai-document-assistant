@@ -24,11 +24,11 @@ export default function Header({
             <h1 className="font-bold text-sm tracking-wide bg-gradient-to-r from-white via-slate-200 to-cyber-muted bg-clip-text text-transparent font-['Outfit']">
               AI DOCUMENT ASSISTANT
             </h1>
-            <span className="text-[10px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded-full border bg-blue-500/10 text-blue-400 border-blue-500/20">
-              OFFLINE LOCAL
+            <span className="text-[10px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded-full border bg-cyan-500/10 text-cyan-400 border-cyan-500/20">
+              CLOUD RAG
             </span>
           </div>
-          <p className="text-[10px] text-cyber-muted font-mono">100% Private Offline AI</p>
+          <p className="text-[10px] text-cyber-muted font-mono">Intelligent Document Intelligence</p>
         </div>
       </div>
 
@@ -59,24 +59,12 @@ export default function Header({
         </button>
 
         <button
-          onClick={onOpenLicense}
-          className={`px-2.5 py-1.5 rounded-lg font-medium text-xs flex items-center space-x-1.5 transition-all border ${
-            isLicensed
-              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20'
-              : licenseInfo?.is_trial_locked
-                ? 'bg-rose-500/10 text-rose-400 border-rose-500/30 hover:bg-rose-500/20 animate-pulse'
-                : 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30 hover:bg-cyan-500/20'
-          }`}
-          title="Manage License & Registration"
+          onClick={onOpenSettings}
+          className="px-2.5 py-1.5 rounded-lg font-medium text-xs flex items-center space-x-1.5 transition-all border bg-cyan-500/10 text-cyan-400 border-cyan-500/30 hover:bg-cyan-500/20"
+          title="Cloud Engine Settings & API Keys"
         >
-          <Key className="w-3.5 h-3.5" />
-          <span>
-            {isLicensed 
-              ? (licenseInfo?.tier || 'LICENSED') 
-              : licenseInfo?.is_trial_locked
-                ? 'Trial Expired — Unlock'
-                : `Trial: ${licenseInfo?.trial_queries_remaining ?? 3} Qs Left`}
-          </span>
+          <Settings className="w-3.5 h-3.5" />
+          <span>Model Settings</span>
         </button>
 
         <button

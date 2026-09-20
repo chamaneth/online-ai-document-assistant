@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
@@ -6,23 +6,23 @@ import ChatWorkspace from './components/ChatWorkspace';
 import AdminDashboard from './components/AdminDashboard';
 import SettingsModal from './components/SettingsModal';
 import PasteTextModal from './components/PasteTextModal';
-import LicenseModal from './components/LicenseModal';
 import LoadingScreen from './components/LoadingScreen';
 import { API_BASE_URL, API_SECRET_KEY } from './config';
 
 axios.defaults.headers.common['X-API-Key'] = API_SECRET_KEY;
 
 export default function App() {
+  const abortControllerRef = useRef(null);
   const [initialLoading, setInitialLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('chat');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isPasteModalOpen, setIsPasteModalOpen] = useState(false);
-  const [isLicenseModalOpen, setIsLicenseModalOpen] = useState(false);
   const [showAdminPanel, setShowAdminPanel] = useState(true);
-  const [licenseInfo, setLicenseInfo] = useState(null);
   
   const [appSettings, setAppSettings] = useState({
     theme: 'cyber-dark',
+    provider: 'groq',
+    apiKey: '',
     topK: 3,
     maxLength: 512,
     autoScroll: true,
@@ -162,8 +162,29 @@ export default function App() {
     }
   };
 
+  const handleStopResponse = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setLoadingQuery(false);
+    setStatusMessage('Response stopped by user.');
+    setMessages(prev => [
+      ...prev,
+      {
+        sender: 'bot',
+        text: '⏹️ Generation stopped by user.',
+        citations: []
+      }
+    ]);
+  };
+
   const handleSendMessage = async (questionText) => {
     if (!questionText.trim()) return;
+
+    // Create abort controller for stop response capability
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
     const userMsg = { sender: 'user', text: questionText };
     setMessages(prev => [...prev, userMsg]);
@@ -174,7 +195,11 @@ export default function App() {
         question: questionText,
         chat_history: messages.map(m => ({ sender: m.sender, text: m.text })),
         top_k: appSettings.topK || 3,
-        max_length: appSettings.maxLength || 512
+        max_length: appSettings.maxLength || 512,
+        provider: appSettings.provider,
+        api_key: appSettings.apiKey
+      }, {
+        signal: controller.signal
       });
 
       const botMsg = {
@@ -184,8 +209,10 @@ export default function App() {
       };
 
       setMessages(prev => [...prev, botMsg]);
-      fetchLicenseStatus();
     } catch (err) {
+      if (axios.isCancel(err) || err.name === 'CanceledError' || err.code === 'ERR_CANCELED') {
+        return; // User canceled request intentionally
+      }
       const errMsg = err.response?.data?.detail || err.message || 'Failed to get answer.';
       setMessages(prev => [
         ...prev,
@@ -195,12 +222,9 @@ export default function App() {
           citations: []
         }
       ]);
-      if (typeof errMsg === 'string' && errMsg.includes('TRIAL_LIMIT')) {
-        fetchLicenseStatus();
-        setIsLicenseModalOpen(true);
-      }
     } finally {
       setLoadingQuery(false);
+      abortControllerRef.current = null;
     }
   };
 
@@ -268,8 +292,6 @@ export default function App() {
         activeTab={activeTab} 
         setActiveTab={setActiveTab}
         onOpenSettings={() => setIsSettingsOpen(true)}
-        licenseInfo={licenseInfo}
-        onOpenLicense={() => setIsLicenseModalOpen(true)}
       />
       
       {activeTab === 'chat' ? (
@@ -287,12 +309,11 @@ export default function App() {
           <ChatWorkspace
             messages={messages}
             onSendMessage={handleSendMessage}
+            onStopResponse={handleStopResponse}
             onExportChat={handleExportChat}
             loading={loadingQuery}
             hasDocs={indexedDocs.length > 0}
             settings={appSettings}
-            licenseInfo={licenseInfo}
-            onOpenLicense={() => setIsLicenseModalOpen(true)}
           />
         </div>
       ) : (
@@ -310,13 +331,6 @@ export default function App() {
         isOpen={isPasteModalOpen}
         onClose={() => setIsPasteModalOpen(false)}
         onAddText={handleUploadRawText}
-      />
-
-      <LicenseModal
-        isOpen={isLicenseModalOpen}
-        onClose={() => setIsLicenseModalOpen(false)}
-        licenseInfo={licenseInfo}
-        onLicenseUpdated={fetchLicenseStatus}
       />
     </div>
   );

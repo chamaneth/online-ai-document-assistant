@@ -37,8 +37,12 @@ class RAGService:
     def _save_indexed_documents(self):
         try:
             os.makedirs(os.path.dirname(self.docs_metadata_path), exist_ok=True)
-            with open(self.docs_metadata_path, "w", encoding="utf-8") as f:
+            temp_path = f"{self.docs_metadata_path}.tmp"
+            with open(temp_path, "w", encoding="utf-8") as f:
                 json.dump(self.indexed_documents, f, indent=2)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(temp_path, self.docs_metadata_path)
         except Exception as e:
             print(f"[Warning] Failed to save indexed_docs.json: {e}")
 
@@ -75,21 +79,58 @@ class RAGService:
                 if combined_text.strip():
                     documents = [Document(page_content=combined_text, metadata={"source": safe_filename, "page": 0})]
             except Exception:
-                try:
-                    loader = TextLoader(file_path, encoding='utf-8')
-                    documents = loader.load()
-                except Exception:
-                    pass
-        elif ext in ['.txt', '.md', '.json', '.html', '.rtf', '.csv']:
+                pass
+        elif ext == '.csv':
             try:
-                loader = TextLoader(file_path, encoding='utf-8')
-                documents = loader.load()
+                import csv
+                rows = []
+                for enc in ['utf-8-sig', 'utf-8', 'latin-1']:
+                    try:
+                        with open(file_path, 'r', encoding=enc, errors='replace') as f:
+                            reader = csv.reader(f)
+                            for r in reader:
+                                line = " | ".join(cell.strip() for cell in r if cell.strip())
+                                if line:
+                                    rows.append(line)
+                        break
+                    except Exception:
+                        continue
+                if rows:
+                    documents = [Document(page_content="\n".join(rows), metadata={"source": safe_filename, "page": 0})]
             except Exception:
+                pass
+        elif ext == '.json':
+            try:
+                for enc in ['utf-8-sig', 'utf-8', 'latin-1']:
+                    try:
+                        with open(file_path, 'r', encoding=enc, errors='replace') as f:
+                            parsed = json.load(f)
+                            formatted = json.dumps(parsed, indent=2)
+                            documents = [Document(page_content=formatted, metadata={"source": safe_filename, "page": 0})]
+                        break
+                    except Exception:
+                        continue
+            except Exception:
+                pass
+
+        # Fallback for plain text, markdown, html, rtf or any other text-based formats
+        if not documents and ext in ['.txt', '.md', '.json', '.html', '.rtf', '.csv', '.docx']:
+            for enc in ['utf-8-sig', 'utf-8', 'latin-1']:
                 try:
-                    loader = TextLoader(file_path, encoding='latin-1')
-                    documents = loader.load()
+                    with open(file_path, 'r', encoding=enc, errors='replace') as f:
+                        text_content = f.read()
+                        if text_content.strip():
+                            documents = [Document(page_content=text_content, metadata={"source": safe_filename, "page": 0})]
+                            break
                 except Exception:
-                    pass
+                    continue
+
+        # Uniform metadata normalization across all file loaders
+        for idx, doc in enumerate(documents):
+            doc.metadata["source"] = safe_filename
+            if "page" not in doc.metadata:
+                doc.metadata["page"] = 0
+
         return documents
 
     def get_or_create_vector_db(self) -> Chroma:
@@ -171,9 +212,18 @@ class RAGService:
             raise HTTPException(status_code=500, detail=f"Error processing '{safe_filename}': {str(e)}")
 
     async def process_raw_text_upload(self, title: str, content: str) -> Dict[str, Any]:
-        sanitized_title = os.path.basename(title.strip() if title else "Pasted_Note")
+        raw_name = title.strip() if title else "Pasted_Note"
+        sanitized_title = os.path.basename(raw_name)
         if not sanitized_title.endswith('.txt'):
             sanitized_title += ".txt"
+
+        # Deduplicate note titles to avoid overwriting existing documents
+        base_stem, ext = os.path.splitext(sanitized_title)
+        counter = 1
+        existing_filenames = {d["filename"] for d in self.indexed_documents}
+        while sanitized_title in existing_filenames or os.path.exists(os.path.join(settings.UPLOADS_DIR, sanitized_title)):
+            sanitized_title = f"{base_stem}_{counter}{ext}"
+            counter += 1
 
         file_path = os.path.abspath(os.path.join(settings.UPLOADS_DIR, sanitized_title))
         if not file_path.startswith(os.path.abspath(settings.UPLOADS_DIR)):
@@ -203,8 +253,7 @@ class RAGService:
                 "extension": ".txt"
             }
 
-            if not any(d["filename"] == sanitized_title for d in self.indexed_documents):
-                self.indexed_documents.append(doc_info)
+            self.indexed_documents.append(doc_info)
             self._save_indexed_documents()
 
             return {
@@ -229,19 +278,12 @@ class RAGService:
             except Exception as e:
                 print(f"[Warning] Could not delete file {file_path}: {e}")
 
+        # Targeted deletion from ChromaDB vector collection
         if self.vector_db is not None:
-            self.vector_db.delete_collection()
-            self.vector_db = None
-            self.get_or_create_vector_db()
-
-        for doc_item in list(self.indexed_documents):
-            remaining_file = os.path.join(settings.UPLOADS_DIR, doc_item["filename"])
-            if os.path.exists(remaining_file):
-                ext = doc_item.get("extension", os.path.splitext(doc_item["filename"])[1].lower())
-                docs = self._load_file_documents(remaining_file, ext, doc_item["filename"])
-                if docs:
-                    chunks = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50).split_documents(docs)
-                    self.vector_db.add_documents(chunks)
+            try:
+                self.vector_db._collection.delete(where={"source": safe_filename})
+            except Exception as e:
+                print(f"[Warning] Targeted Chroma deletion notice: {e}")
 
         self._save_indexed_documents()
 
@@ -256,7 +298,9 @@ class RAGService:
         question: str,
         chat_history: Optional[List[Dict[str, Any]]] = None,
         top_k: int = 3,
-        max_length: int = 512
+        max_length: int = 512,
+        custom_api_key: Optional[str] = None,
+        provider: Optional[str] = None
     ) -> QueryResponse:
         sanitized_question = question.strip() if question else ""
         if not sanitized_question:
@@ -271,7 +315,7 @@ class RAGService:
 
         try:
             db = self.get_or_create_vector_db()
-            llm = get_llm()
+            llm = get_llm(custom_api_key=custom_api_key, provider=provider)
 
             k_val = max(1, min(top_k, 10))
             retriever = db.as_retriever(search_kwargs={"k": k_val})
@@ -285,7 +329,6 @@ class RAGService:
                     formatted_turns.append(f"{role}: {turn.get('text', '')}")
                 history_context = "Previous Conversation Context:\n" + "\n".join(formatted_turns) + "\n\nCurrent Question: "
 
-            augmented_query = f"{history_context}{sanitized_question}"
             retrieved_docs = retriever.invoke(sanitized_question)
 
             if not retrieved_docs:
@@ -295,18 +338,25 @@ class RAGService:
                     citations=[]
                 )
 
-            qa_chain = RetrievalQA.from_chain_type(
-                llm=llm,
-                retriever=retriever,
-                return_source_documents=True
-            )
+            # Build concise context passages from top retrieved chunks
+            context_snippets = []
+            for i, doc in enumerate(retrieved_docs):
+                context_snippets.append(f"Passage {i+1}:\n{doc.page_content.strip()}")
+            context_text = "\n\n".join(context_snippets)
 
-            result = qa_chain.invoke({"query": augmented_query})
-            answer = result.get("result", "Unable to generate an answer.").strip()
+            prompt = f"""You are a helpful document assistant. Answer the user's question accurately using ONLY the context passages below. If the answer is not in the passages, state that concisely.
+
+Context:
+{context_text}
+
+{history_context}Question: {sanitized_question}
+Answer:"""
+
+            raw_answer = llm.invoke(prompt)
+            answer = str(raw_answer).strip() if raw_answer else "Unable to generate an answer."
 
             citations = []
-            source_docs = result.get("source_documents", retrieved_docs)
-            for doc in source_docs:
+            for doc in retrieved_docs:
                 meta = doc.metadata or {}
                 source_name = os.path.basename(meta.get("source", "Uploaded Document"))
                 page_num = int(meta.get("page", 0)) + 1
