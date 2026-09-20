@@ -2,7 +2,6 @@ from fastapi import APIRouter, Depends, HTTPException
 from core.security import verify_api_key
 from core.schemas import QueryRequest, QueryResponse
 from core.services.rag_service import rag_service
-from core.licensing import record_trial_query, get_current_license
 
 router = APIRouter(tags=["Query & Operations"])
 
@@ -14,8 +13,6 @@ async def query_rag(request: QueryRequest):
             answer="No documents are currently indexed in your library. Please upload a PDF, Word document, or paste a note in the sidebar first.",
             citations=[]
         )
-
-    record_trial_query()
 
     return await rag_service.execute_query(
         question=request.question,

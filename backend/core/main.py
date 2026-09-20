@@ -6,13 +6,12 @@ from core.routes.health import router as health_router
 from core.routes.pdf import router as pdf_router
 from core.routes.query import router as query_router
 from core.routes.admin import router as admin_router
-from core.routes.license import router as license_router
 
 def create_app() -> FastAPI:
     app = FastAPI(
-        title="AI Document Assistant Cloud API",
-        description="High-Performance Cloud RAG Platform with Semantic Vector Search, Dynamic Citations & Secure Architecture",
-        version="2.0.0"
+        title="AI Document Assistant API",
+        description="Full-stack Document Intelligence & RAG Platform with Vector Search, Citations & Fast Inference",
+        version="1.0.0"
     )
 
     app.middleware("http")(add_security_headers)
@@ -29,7 +28,6 @@ def create_app() -> FastAPI:
     app.include_router(pdf_router)
     app.include_router(query_router)
     app.include_router(admin_router)
-    app.include_router(license_router)
 
     return app
 
