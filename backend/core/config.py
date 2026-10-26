@@ -1,0 +1,40 @@
+import os
+from dotenv import load_dotenv
+
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+load_dotenv(os.path.join(BASE_DIR, ".env"))
+
+class Settings:
+    SERVER_HOST: str = os.environ.get("SERVER_HOST", "0.0.0.0")
+    SERVER_PORT: int = int(os.environ.get("SERVER_PORT", "8000"))
+    ALLOWED_ORIGINS: list = os.environ.get("ALLOWED_ORIGINS", "*").split(",")
+    API_SECRET_KEY: str = os.environ.get("API_SECRET_KEY", "local_sec_token_984712839")
+
+    # Document & Vector Storage Directories
+    UPLOADS_DIR: str = os.path.join(BASE_DIR, "uploads")
+    CHROMA_DIR: str = os.path.join(BASE_DIR, ".chroma_db")
+    MODELS_DIR: str = os.path.join(BASE_DIR, ".models")
+    EMBEDDINGS_DIR: str = os.path.join(MODELS_DIR, "embeddings")
+
+    DATA_DIR: str = os.path.join(BASE_DIR, "data")
+
+    # Embedding & RAG Parameters
+    EMBEDDING_MODEL_NAME: str = os.environ.get("EMBEDDING_MODEL_NAME", "sentence-transformers/all-MiniLM-L6-v2")
+    MAX_FILE_SIZE_BYTES: int = int(os.environ.get("MAX_FILE_SIZE_MB", "50")) * 1024 * 1024
+
+    # Groq Cloud LLM Provider (Online Model)
+    LLM_PROVIDER: str = os.environ.get("LLM_PROVIDER", "groq")
+    GROQ_API_KEY: str = os.environ.get("GROQ_API_KEY", "")
+    GROQ_MODEL: str = os.environ.get("GROQ_MODEL", "openai/gpt-oss-20b")
+    OPENAI_API_KEY: str = os.environ.get("OPENAI_API_KEY", "")
+    OPENAI_MODEL: str = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
+
+    def __init__(self):
+        os.makedirs(self.UPLOADS_DIR, exist_ok=True)
+        os.makedirs(self.CHROMA_DIR, exist_ok=True)
+        os.makedirs(self.DATA_DIR, exist_ok=True)
+        os.makedirs(self.MODELS_DIR, exist_ok=True)
+        os.makedirs(self.EMBEDDINGS_DIR, exist_ok=True)
+settings = Settings()
+
+

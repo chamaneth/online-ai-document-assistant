@@ -1,0 +1,19 @@
+{
+  "name": "online-ai-document-assistant",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Full-Stack AI Document Assistant Web Application (React + FastAPI + ChromaDB + Groq/OpenAI)",
+  "scripts": {
+    "dev": "npm --prefix frontend run dev",
+    "build": "npm --prefix frontend run build"
+  },
+  "keywords": [
+    "rag",
+    "react",
+    "fastapi",
+    "chromadb",
+    "groq",
+    "openai",
+    "ai-document-assistant"
+  ]
+}
